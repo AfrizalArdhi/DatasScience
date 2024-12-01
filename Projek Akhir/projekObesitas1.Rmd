@@ -1,0 +1,245 @@
+---
+title: "ProjectDS"
+author: "Afrizal Ardhi"
+date: "2024-11-26"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidymodels)
+library(tidyverse)
+library(nnet)
+library(dplyr)
+library(caret)
+```
+
+
+#Data Gathering
+```{r}
+#csv obesitas
+dataOb = read.csv("ObesityDataSet.csv")
+head(dataOb)
+#view(dataOb)
+```
+
+#Preprocessing Data
+```{r}
+# Hapus NA value
+dataOb = na.omit(dataOb)
+
+#Hilangkan Kolom yang tidak ingin dipakai
+dataOb = dataOb %>% select(-SMOKE, -SCC, -TUE)
+
+#Mengubah Kategorikal menjadi numerik
+dataOb <- dataOb %>%
+  mutate(
+    Gender = as.numeric(factor(Gender, levels = c("Female", "Male"))),
+    family_history_with_overweight = ifelse(family_history_with_overweight == "yes", 1, 0),
+    FAVC = ifelse(FAVC == "yes", 1, 0),
+    MTRANS = as.numeric(factor(MTRANS)),
+    CALC = as.numeric(factor(CALC, levels = c("no", "Sometimes", "Frequently", "Always"))),
+    CAEC = as.numeric(factor(CAEC, levels = c("no", "Sometimes", "Frequently", "Always")))
+  )
+dataOb <- dataOb %>%
+  rename(FHWO = family_history_with_overweight)
+
+head(dataOb)
+```
+
+
+#Split Data 80:20
+```{r}
+set.seed(420)
+split = initial_split(dataOb, prop = 0.8)
+datatrain = training(split)
+datatest = testing(split)
+print(datatrain)
+print(datatest)
+```
+
+
+# Data Modelling (Multinominal Logistic Regression)
+```{r}
+formula = "NObeyesdad ~ ."
+hasil_model = multinom(formula, data = datatrain)
+
+summary(hasil_model)
+
+```
+
+# Data Testing
+```{r}
+#class
+hasil_prediksi = predict(object = hasil_model, newdata = datatest, type = "class")
+#hasil_prediksi
+```
+
+# Perbandingan predicted vs Actual
+```{r}
+comparison <- data.frame(
+  Actual = datatest$NObeyesdad,
+  Predicted = hasil_prediksi
+)
+head(comparison)
+```
+
+#Matrix Confussion
+```{r}
+confusion_mat <- confusionMatrix(
+  table(
+    Predicted = hasil_prediksi,
+    Actual = datatest$NObeyesdad
+  )
+)
+confusion_mat
+```
+
+#Accuration
+```{r}
+#paste0 buat nyatuin 2 string, dibawah angka sm persen
+akurasi = paste0(round(((47+63+72 + 47 + 65 + 52 + 47)/423)*100, digit = 2), "%") 
+akurasi
+```
+
+```{r}
+# Precision, Recall, dan F1-Score
+metrics <- data.frame(
+  Precision = confusion_mat$byClass[, "Pos Pred Value"],
+  Recall = confusion_mat$byClass[, "Sensitivity"],
+  F1_Score = 2 * (confusion_mat$byClass[, "Pos Pred Value"] * confusion_mat$byClass[, "Sensitivity"]) /
+    (confusion_mat$byClass[, "Pos Pred Value"] + confusion_mat$byClass[, "Sensitivity"])
+)
+# Menampilkan hasil
+print(metrics)
+```
+
+
+# Coba Shiny
+```{r}
+library(shiny)
+library(bslib)
+library(ggplot2)
+```
+
+#Coding Web
+```{r}
+ui = page_fluid(
+  titlePanel("Obesity Database"),
+  
+  theme = bs_theme(bg = "white", fg = "black", primary = "#4CAF50"),
+  
+  layout_columns(
+    value_box(
+      title = "Man",
+      value = nrow(dataOb %>% filter(Gender == 2)), # Male = 2
+      showcase = icon("male"),
+      status = "primary"
+    ),
+    value_box(
+      title = "Woman",
+      value = nrow(dataOb %>% filter(Gender == 1)), # Female = 1
+      showcase = icon("female"),
+      status = "warning"
+    )
+  ),
+  
+  titlePanel("Visualisasi Data"),
+  plotOutput("plotDistribusiObesity"),
+  
+  selectInput(
+    "selectObeLevel",
+    "Pilih Level Obesitas:",
+    choices = unique(dataOb$NObeyesdad)
+  ),
+  
+  tableOutput("tableObesity"),
+  
+  titlePanel("Uji Coba Klasifikasi Level"),
+  layout_columns(
+    selectInput("gender", "Gender: ", choices = list("Choose gender" = "", "Male" = 1, "Female" = 2), selected = ""),
+    numericInput("age", "Age: ", value = 0),
+    numericInput("height", "Height (inches): ", value = 0),
+    numericInput("weight", "Weight: (kg)", value = 0),
+    selectInput("fhwo", "Family History With Overweight: ", choices = list("Choose" = "", "Yes" = 1, "No" = 0), selected = ""),
+    selectInput("favc", "Do you eat high caloric food frequently: ", choices = list("Choose" = "", "Yes" = 1, "No" = 0), selected = ""),
+    selectInput("fcvc", "Do you usually eat vegetables in your meals: ", choices = list("Choose" = "", "Never" = 1, "Sometimes" = 2, "Always" = 3), selected = ""),
+    selectInput("ncp", "How many meals do you have daily: ", choices = list("Choose" = "", "1 Meal" = 1, "2 Meals" = 2, "3 Meals" = 3), selected = ""),
+    selectInput("caec", "Do you eat any food between meals: ", choices = list("Choose" = "", "No" = 1, "Sometimes" = 2, "Frequently" = 3, "Always" = 4), selected = ""),
+    selectInput("ch2o", "How much water do you drink daily: ", choices = list("Choose" = "", "<1L" = 1, "1-2L" = 2, ">2L" = 3), selected = ""),
+    selectInput("faf", "How often do you have physical activity: ", choices = list("Choose" = "", "I do not have" = 0, "1-2 Days" = 1, "2-4 Days" = 2, "4-5 Days" = 3), selected = ""),
+    selectInput("calc", "How often do you drink alcohol: ", choices = list("Choose" = "", "I do not drink" = 1, "Sometimes" = 2, "Frequently" = 3, "Always" = 4), selected = ""),
+    selectInput("mtrans", "Which transportation do you usually use: ", choices = list("Choose" = "", "Automobile" = 1, "Motorbike" = 2, "Bike" = 3, "Public Transportation" = 4, "Walking" = 5), selected = ""),
+  ),
+  actionButton("tombol_klasifikasi", "Cek Level Obesitas"),
+  textOutput("output_teks")
+)
+
+server = function(input, output){
+  
+  # Tampilkan tabel berdasarkan filter level obesitas
+  output$tableObesity = renderTable(
+    dataOb %>% filter(NObeyesdad == input$selectObeLevel) %>% head()
+  )
+  
+  # Tampilkan plot distribusi obesitas
+  output$plotDistribusiObesity = renderPlot({
+  ggplot(dataOb, aes(x = NObeyesdad, fill = NObeyesdad)) +
+    geom_bar() +
+    theme_minimal() +
+    labs(
+      title = "Distribusi Level Obesitas",
+      x = "Level Obesitas",
+      y = "Jumlah",
+      fill = "Level Obesitas"
+    ) +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),  # Ukuran teks judul
+      axis.title.x = element_text(size = 16),              # Ukuran teks sumbu X
+      axis.title.y = element_text(size = 16),              # Ukuran teks sumbu Y
+      axis.text.x = element_text(size = 12),               # Ukuran teks label sumbu X
+      axis.text.y = element_text(size = 12),               # Ukuran teks label sumbu Y
+      legend.title = element_text(size = 14),              # Ukuran teks judul (keterangan)
+      legend.text = element_text(size = 12)                # Ukuran teks isi (keterangan)
+    )
+})
+  
+  # Prediksi level obesitas berdasarkan input
+  output$output_teks = renderText({
+    input_klasifikasi = data.frame(
+      Gender = as.numeric(input$gender),
+      Age = as.numeric(input$age),
+      Height = as.numeric(input$height) / 100,
+      Weight = as.numeric(input$weight),
+      FHWO = as.numeric(input$fhwo),
+      FAVC = as.numeric(input$favc),
+      FCVC = as.numeric(input$fcvc),
+      NCP = as.numeric(input$ncp),
+      CAEC = as.numeric(input$caec),
+      CH2O = as.numeric(input$ch2o),
+      FAF = as.numeric(input$faf),
+      CALC = as.numeric(input$calc),
+      MTRANS = as.numeric(input$mtrans)
+    )
+    
+    # Debugging: cetak input jika diperlukan
+    print(input_klasifikasi)
+    
+    # Prediksi dengan model
+    hasil_pred = predict(
+      hasil_model, 
+      newdata = input_klasifikasi,
+      type = "class"
+    )
+    paste("Predicted Obesity Level: ", hasil_pred)
+  }) |> bindEvent(input$tombol_klasifikasi)
+}
+
+shinyApp(ui, server)
+
+```
+
+
