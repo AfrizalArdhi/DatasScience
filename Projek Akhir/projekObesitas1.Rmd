@@ -17,14 +17,30 @@ library(dplyr)
 library(caret)
 ```
 
+#Bisnis Understanding
+Masalah: Obesitas adalah masalah kesehatan global yang dapat menyebabkan penyakit kronis seperti diabetes, penyakit jantung, dan hipertensi. Pemantauan dan pengelolaan obesitas menjadi tantangan penting di dunia kesehatan.
+Konteks Dataset: Dataset ini berisi informasi tentang kebiasaan makan, aktivitas fisik, dan kondisi kesehatan individu, yang diklasifikasikan berdasarkan tingkat obesitas.
+Tujuan Bisnis: Membantu organisasi kesehatan atau profesional medis dalam mendeteksi risiko obesitas sejak dini untuk intervensi yang tepat waktu.
 
 #Data Gathering
 ```{r}
-#csv obesitas
+#csv obesitasS
 dataOb = read.csv("ObesityDataSet.csv")
 head(dataOb)
-#view(dataOb)
+view(dataOb)
 ```
+FAVC = 	Do you eat high caloric food frequently?
+FCVC = Do you usually eat vegetables in your meals?
+NCP = How many main meals do you have daily?
+CAEC = Do you eat any food between meals?
+SMOKE = Do you smoke?	
+CH2O = How much water do you drink daily?	
+SCC	= Do you monitor the calories you eat daily?	
+FAF	= How often do you have physical activity?	
+TUE = How much time do you use technological devices such as cell phone, videogames, television, computer and others?	
+CALC = How often do you drink alcohol?	
+MTRANS = Which transportation do you usually use?	
+NObeyesdad	= Obesity level	
 
 #Preprocessing Data
 ```{r}
@@ -75,7 +91,7 @@ summary(hasil_model)
 ```{r}
 #class
 hasil_prediksi = predict(object = hasil_model, newdata = datatest, type = "class")
-#hasil_prediksi
+hasil_prediksi
 ```
 
 # Perbandingan predicted vs Actual
@@ -84,8 +100,23 @@ comparison <- data.frame(
   Actual = datatest$NObeyesdad,
   Predicted = hasil_prediksi
 )
-head(comparison)
+comparison
 ```
+```{r}
+comparison %>%
+  count(Actual, Predicted) %>%
+  ggplot(aes(x = Actual, y = n, fill = Predicted)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Perbandingan Kategori Actual vs Predicted",
+    x = "Kategori Actual",
+    y = "Jumlah",
+    fill = "Predicted"
+  ) +
+  theme_minimal() +  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Memutar label sumbu X
+```
+
+
 
 #Matrix Confussion
 ```{r}
@@ -97,6 +128,7 @@ confusion_mat <- confusionMatrix(
 )
 confusion_mat
 ```
+sensitifity = persentase prediksi berhasil
 
 #Accuration
 ```{r}
@@ -104,20 +136,6 @@ confusion_mat
 akurasi = paste0(round(((47+63+72 + 47 + 65 + 52 + 47)/423)*100, digit = 2), "%") 
 akurasi
 ```
-
-```{r}
-# Precision, Recall, dan F1-Score
-metrics <- data.frame(
-  Precision = confusion_mat$byClass[, "Pos Pred Value"],
-  Recall = confusion_mat$byClass[, "Sensitivity"],
-  F1_Score = 2 * (confusion_mat$byClass[, "Pos Pred Value"] * confusion_mat$byClass[, "Sensitivity"]) /
-    (confusion_mat$byClass[, "Pos Pred Value"] + confusion_mat$byClass[, "Sensitivity"])
-)
-# Menampilkan hasil
-print(metrics)
-```
-
-
 # Coba Shiny
 ```{r}
 library(shiny)
@@ -167,7 +185,7 @@ ui = page_fluid(
     selectInput("fhwo", "Family History With Overweight: ", choices = list("Choose" = "", "Yes" = 1, "No" = 0), selected = ""),
     selectInput("favc", "Do you eat high caloric food frequently: ", choices = list("Choose" = "", "Yes" = 1, "No" = 0), selected = ""),
     selectInput("fcvc", "Do you usually eat vegetables in your meals: ", choices = list("Choose" = "", "Never" = 1, "Sometimes" = 2, "Always" = 3), selected = ""),
-    selectInput("ncp", "How many meals do you have daily: ", choices = list("Choose" = "", "1 Meal" = 1, "2 Meals" = 2, "3 Meals" = 3), selected = ""),
+    selectInput("ncp", "How many meals do you have daily: ", choices = list("Choose" = "", "1 Meal" = 1, "2 Meals" = 2, "3 Meals" = 3, "4 Meals" = 4), selected = ""),
     selectInput("caec", "Do you eat any food between meals: ", choices = list("Choose" = "", "No" = 1, "Sometimes" = 2, "Frequently" = 3, "Always" = 4), selected = ""),
     selectInput("ch2o", "How much water do you drink daily: ", choices = list("Choose" = "", "<1L" = 1, "1-2L" = 2, ">2L" = 3), selected = ""),
     selectInput("faf", "How often do you have physical activity: ", choices = list("Choose" = "", "I do not have" = 0, "1-2 Days" = 1, "2-4 Days" = 2, "4-5 Days" = 3), selected = ""),
@@ -182,7 +200,8 @@ server = function(input, output){
   
   # Tampilkan tabel berdasarkan filter level obesitas
   output$tableObesity = renderTable(
-    dataOb %>% filter(NObeyesdad == input$selectObeLevel) %>% head()
+    dataOb %>% filter(NObeyesdad == input$selectObeLevel) %>% head(),
+    
   )
   
   # Tampilkan plot distribusi obesitas
